@@ -1,6 +1,7 @@
 /// <reference types="node" />
 import { EventEmitter } from "tsee";
 import { Bound } from "./bound";
+export declare function parseGazePayload(payload: string): [number, number, number] | undefined;
 export declare class TobiiProcess extends EventEmitter<{
     gaze: (x: number, y: number, timestamp: number) => void;
     enter: (index: number) => void;

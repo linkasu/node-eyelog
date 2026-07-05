@@ -3,7 +3,7 @@ const path = require("path");
 const fs = require("fs");
 const decompress = require('decompress');
 
-const VERSION = "1.1.2.0";
+const VERSION = "1.1.3.0";
 const REPO = "linkasu/EyeLog";
 
 async function main() {

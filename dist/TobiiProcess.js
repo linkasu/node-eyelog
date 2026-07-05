@@ -1,10 +1,27 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.TobiiProcess = void 0;
+exports.TobiiProcess = exports.parseGazePayload = void 0;
 const child_process_1 = require("child_process");
 const tsee_1 = require("tsee");
 const path_1 = require("path");
 const os_1 = require("os");
+function parseGazePayload(payload) {
+    const parts = payload.split(',').map((part) => part.trim()).filter(Boolean);
+    const values = parts.length === 3
+        ? parts
+        : parts.length === 5
+            ? [`${parts[0]}.${parts[1]}`, `${parts[2]}.${parts[3]}`, parts[4]]
+            : parts.length === 6
+                ? [`${parts[0]}.${parts[1]}`, `${parts[2]}.${parts[3]}`, `${parts[4]}.${parts[5]}`]
+                : [];
+    if (values.length !== 3)
+        return undefined;
+    const numbers = values.map((value) => Number(value));
+    if (!numbers.every(Number.isFinite))
+        return undefined;
+    return [numbers[0], numbers[1], numbers[2]];
+}
+exports.parseGazePayload = parseGazePayload;
 class TobiiProcess extends tsee_1.EventEmitter {
     constructor(exe = (0, path_1.join)(__dirname, '../bin/EyeLog.exe')) {
         super();
@@ -51,8 +68,8 @@ class TobiiProcess extends tsee_1.EventEmitter {
             return;
         }
         if (data.startsWith('gaze:')) {
-            const args = data.substring('gaze:'.length).split(',').map((s => +s));
-            if (args.length >= 3 && args.every(Number.isFinite)) {
+            const args = parseGazePayload(data.substring('gaze:'.length));
+            if (args) {
                 this.emit('gaze', args[0], args[1], args[2]);
             }
             return;
