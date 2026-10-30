@@ -1,0 +1,28 @@
+name: SDK installation
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  install:
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.2
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run build
+      - run: npm test
+      - run: npm run test:provision
+      - run: node download.js
+      - run: node download.js
+      - run: npm audit
+      - run: npm audit --omit=dev
