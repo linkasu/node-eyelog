@@ -182,7 +182,7 @@ test('download deadline kills stalled transport', async (t) => {
     assert.equal(killed, true);
 });
 
-test('Windows open-file sharing violation preserves the working output', { skip: process.platform !== 'win32' }, async (t) => {
+test('Windows open-file sharing violation preserves the working output', { skip: process.platform !== 'win32', timeout: 30000 }, async (t) => {
     const { spawn } = require('node:child_process');
     const root = await fixture(t);
     const archive = valid();
@@ -191,16 +191,21 @@ test('Windows open-file sharing violation preserves the working output', { skip:
         '$f=[System.IO.File]::Open($env:EYELOG_LOCK_FILE,[System.IO.FileMode]::Open,[System.IO.FileAccess]::Read,[System.IO.FileShare]::Read); [Console]::WriteLine("READY"); [Console]::ReadLine() | Out-Null; $f.Dispose()'],
     { env: { ...process.env, EYELOG_LOCK_FILE: path.join(root, 'bin', REQUIRED[0]) }, stdio: ['pipe', 'pipe', 'pipe'] });
     const closed = new Promise((resolve) => child.once('close', resolve));
-    t.after(async () => { child.stdin.end('\n'); await closed; });
-    await new Promise((resolve, reject) => {
-        const timer = setTimeout(() => { child.kill(); reject(new Error('Windows file-lock helper timed out')); }, 15000);
-        child.once('error', (error) => { clearTimeout(timer); reject(error); });
-        child.once('close', () => { clearTimeout(timer); reject(new Error('Windows file-lock helper exited early')); });
-        child.stdout.on('data', (data) => {
-            if (data.toString().includes('READY')) { clearTimeout(timer); resolve(); }
+    try {
+        await new Promise((resolve, reject) => {
+            const timer = setTimeout(() => { child.kill(); reject(new Error('Windows file-lock helper timed out')); }, 15000);
+            child.once('error', (error) => { clearTimeout(timer); reject(error); });
+            child.once('close', () => { clearTimeout(timer); reject(new Error('Windows file-lock helper exited early')); });
+            child.stdout.on('data', (data) => {
+                if (data.toString().includes('READY')) { clearTimeout(timer); resolve(); }
+            });
         });
-    });
-    await assert.rejects(install({ root, sdk: pin(archive), download: async () => archive }));
-    assert.equal(await fs.readFile(path.join(root, 'bin', REQUIRED[0]), 'utf8'), 'fixture');
-    await clean(root);
+        await assert.rejects(install({ root, sdk: pin(archive), download: async () => archive }));
+        assert.equal(await fs.readFile(path.join(root, 'bin', REQUIRED[0]), 'utf8'), 'fixture');
+        await clean(root);
+    } finally {
+        // Release the OS handle before the fixture cleanup hook; stdin is not a reliable Windows exit signal.
+        child.kill();
+        await closed;
+    }
 });
